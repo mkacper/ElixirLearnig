@@ -1,1 +1,1 @@
-# ElixirLearnig
+# Learnig Elixir
