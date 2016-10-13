@@ -1,0 +1,36 @@
+* funckja task runner, rekursywna
+def loop(map) do
+    receive do
+
+      {:run_task, f, id} ->
+            pid = do_run_task(f)
+            loop(Map.update(map, id, {pid, f, 0}))
+      {'EXIT', pid, reason} when reason != :normal ->
+            id = get_id_for(map,pid)
+            fun = get_fun_for_id(map, id)
+            pid = do_run_task(f)
+            loop(Map.update(map, id, {pid, f, 1}))
+
+      {:check_task, caller, id} ->
+             Map.get...
+             ..
+
+      {:task_result, result} ->
+             Map.update(result....)
+             loop()
+    end
+* jak zwrócic result z taska
+ def do_run_task(f) do
+     tr = self()
+     tf = fn -> send(tr, {:task_result, f.()}) end
+     spawn_link(tf)
+
+* proces startuje od funkcji z nazwą
+def start_link() do
+ ...
+ spawn()
+
+def init() do
+    register(self(), name)
+    map = ...
+    loop(map)
