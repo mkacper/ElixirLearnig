@@ -1,97 +1,59 @@
 defmodule Factorial do
-    @moduledoc """
-    Factorial
-    """
+  @moduledoc """
+  Factorial
+  """
 
+  @doc """
+  Count factorial of a number using some number of separated processes. Number is integer in `n`.
 
-    def multiply_2([h|t]) do
-          h * multiply_2(t)
+  ## Example
+
+      result = Factorial.factorial(60)
+  """
+
+  @proc_count 10
+
+  def factorial(n) when n <= 50, do: _factorial(1, n)
+  def factorial(n) when n > 50 do
+    slice = div(n, @proc_count)
+    r = rem(n, @proc_count)
+    _split(_start = 1, _stop = slice, slice, _pid = self)
+    slices = _receive_slices([])
+    case r do
+      0 -> _multiply(slices)
+      1 -> _multiply(slices) * n
+      _ -> _multiply(slices) * _factorial(@proc_count*slice+1, n)
     end
-    def multiply_2([]) do
-        1
+  end
+
+  defp _split(start, stop, slice, pid) when start < slice*@proc_count do
+    spawn fn -> send(pid, {:res, _factorial(start, stop)}) end
+    _split(stop, stop+slice, slice, pid)
+  end
+  defp _split(start, stop, slice, pid) do
+    :ok
+  end
+
+  defp _factorial(start, start) when start >= 1, do: 1
+  defp _factorial(start, stop) when start >= 1, do: stop * _factorial(start, stop-1)
+  defp _factorial(1, 1), do: 1
+
+  defp _receive_slices(slices) when length(slices) < @proc_count do
+    receive do
+      {:res, result} ->
+        slices = [result|slices]
+        _receive_slices(slices)
     end
+  end
+  defp _receive_slices(slices) do
+    slices
+  end
 
-
-    def make_list([stop|t], stop) do
-        t
-    end
-    def make_list([h|t], stop) do
-        l = [h - 1|[h|t]]
-        make_list(l, stop)
-    end
-
-
-    def make_list2([stop|t], stop, pid) do
-        send(pid, {:sublist, t})
-    end
-    def make_list2([h|t], stop, pid) do
-        l = [h - 1|[h|t]]
-        make_list2(l, stop, pid)
-    end
-
-
-    def split2(0, items, pid) do
-        true
-    end
-    def split2(x, items, pid) do
-        stop = x - items
-        spawn(Factorial, :make_list2, [[x], stop, pid])
-        split2(stop, items, pid)
-    end
-
-
-    def catch_lists(sublists, pid) do
-      range = 1..sublists
-      l = Enum.map(range, fn x -> receive do {:sublist, list} -> list end end)
-      send(pid, {:sublists, l})
-    end
-
-
-    def count_factorial(list, pid) do
-        result = multiply_2(list)
-        send(pid, {:multiply_result, result})
-    end
-
-
-    @doc """
-    Calculate factorial divided number into small parts.
-    First param is number you count the factorial of. Second is the number of multiplifications run in one separated process.
-
-    ## Example
-
-        factorial = Factorial.factorial(50, 5)
-    """
-
-    def factorial(y, items) do
-
-        if y == 0 || items == 0 || y < items do
-
-          IO.puts('Params cannot be qual zero and first one must be equal or grater than the second. Try again.')
-
-        else
-
-            rest = rem(y, items)
-            x = y - rest
-            rest_list = make_list([y], x);
-            sublists = round(x / items)
-
-            catchListPID = spawn(Factorial, :catch_lists, [sublists, self])
-            spawn(Factorial, :split2, [x, items, catchListPID])
-
-            receive do
-                {:sublists, list} -> result = list
-            end
-
-            Enum.map(result, fn x -> spawn(Factorial, :count_factorial, [x, self]) end)
-            range = 1..sublists
-            final = Enum.map(range, fn x -> receive do {:multiply_result, list} -> list end end)
-            final = multiply_2(final)
-            final_list = [final|rest_list]
-            final_result = multiply_2(final_list)
-            final_result
-
-        end
-
-    end
+  defp _multiply([h|t]) do
+    h * _multiply(t)
+  end
+  defp _multiply([]) do
+    1
+  end
 
 end
