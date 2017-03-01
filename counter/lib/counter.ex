@@ -1,7 +1,16 @@
 defmodule Counter do
-  use Application
+  @behaviour Application
 
   def start(_type, _args) do
-    Counter.Supervisor.start_link(10)
+    Application.get_env(:counter, :init_value)
+    |> Counter.Supervisor.start_link
+  end
+
+  def stop(app = :counter) do
+    Application.stop(app)
+    :ok
+  end
+  def stop(_) do
+    {:error, "Invalid name"}
   end
 end

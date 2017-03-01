@@ -29,6 +29,6 @@ defmodule Counter.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    []
+    [{:propcheck, "~> 0.0.1"}]
   end
 end

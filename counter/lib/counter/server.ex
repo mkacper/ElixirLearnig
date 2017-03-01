@@ -9,15 +9,19 @@ defmodule Counter.Server do
   @doc """
   Starts counter.
   """
-  def start_link(value) do
-    GenServer.start_link(__MODULE__, value, name: __MODULE__)
+  def start_link(stash_pid) do
+    GenServer.start_link(__MODULE__, stash_pid, name: __MODULE__)
+  end
+
+  def stop do
+    GenServer.call(__MODULE__, :stop)
   end
 
   @doc """
   Gets current value.
   """
   def get do
-    request = {:get_val, nil}
+    request = :get_val
     GenServer.call(__MODULE__, request)
   end
 
@@ -41,38 +45,43 @@ defmodule Counter.Server do
   Stops server.
   """
   def reset do
-    request = {:reset_val, nil}
-    GenServer.call(__MODULE__, request)
+    request = :reset_val
+    GenServer.cast(__MODULE__, request)
   end
 
   ## Server Callbacks
 
-  def init(value) do
-    {:ok, %{:init_value => value, :current_value => value}}
+  def init(stash_pid) do
+    value = Counter.Stash.get_val stash_pid
+    {:ok, %{:init_value => value, :current_value => value, stash_pid: stash_pid}}
   end
 
-  def handle_call({:get_val, _}, _from, state) do
-    {:reply, Map.get(state, :current_value), state}
+  def handle_call(:get_val, _from, state = %{current_value: value}) do
+    {:reply, value, state}
   end
-  def handle_call({:inc_val, value}, _from, state) do
-    new_value = calculate_new_val({:inc, {{:state, state}, {:value, value}}})
-    {:reply, :ok, Map.put(state, :current_value, new_value)}
+  def handle_call(
+    {:inc_val, value}, _from, state = %{current_value: curr_val}) do
+    new_value = calculate_new_val(:inc, curr_val, value)
+    {:reply, :ok, %{state | :current_value => new_value}}
   end
-  def handle_call({:dec_val, value}, _from, state) do
-    new_value = calculate_new_val({:dec, {{:state, state}, {:value, value}}})
-    {:reply, :ok, Map.put(state, :current_value, new_value)}
+  def handle_call(
+    {:dec_val, value}, _from, state = %{current_value: curr_val}) do
+    new_value = calculate_new_val(:dec, curr_val, value)
+    {:reply, :ok, %{state | :current_value => new_value}}
   end
-  def handle_call({:reset_val, _}, _from, state) do
-    init_value = Map.get(state, :init_value)
-    {:reply, :ok, Map.put(state, :current_value, init_value)}
+  
+  def handle_cast(:reset_val, state = %{init_value: init_value}) do
+    {:noreply, Map.put(state, :current_value, init_value)}
   end
 
-  defp calculate_new_val({:inc, {{:state, state}, {:value, value}}}) do
-    current_val = Map.get(state, :current_value)
-    current_val + value
+  def terminate(_reason, %{stash_pid: pid, current_value: curr_val}) do
+    Counter.Stash.save_val pid, curr_val 
   end
-  defp calculate_new_val({:dec, {{:state, state}, {:value, value}}}) do
-    current_val = Map.get(state, :current_value)
-    current_val - value
+
+  defp calculate_new_val(:inc, curr_value, value) do
+    curr_value + value
+  end
+  defp calculate_new_val(:dec, curr_value, value) do
+    curr_value - value
   end
 end
